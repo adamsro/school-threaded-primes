@@ -1,0 +1,93 @@
+% Robert Adams	02/07/2012	CS 311
+
+\documentclass[letterpaper,10pt]{article} %twocolumn titlepage 
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+
+\usepackage{alltt}
+\usepackage{float}
+\usepackage{color}
+\usepackage{url}
+
+\usepackage{balance}
+\usepackage[TABBOTCAP, tight]{subfigure}
+\usepackage{enumitem}
+\usepackage{pstricks, pst-node}
+
+
+\usepackage{geometry}
+\geometry{margin=1in, textheight=8.5in} %textwidth=6in
+
+%random comment
+
+\newcommand{\cred}[1]{{\color{red}#1}}
+\newcommand{\cblue}[1]{{\color{blue}#1}}
+
+\usepackage{hyperref}
+
+\def\name{Robert M Adams}
+
+%% The following metadata will show up in the PDF properties
+\hypersetup{
+  colorlinks = true,
+  urlcolor = black,
+  pdfauthor = {\name},
+  pdfkeywords = {cs311 ``operating systems'' files filesystem I/O},
+  pdftitle = {CS 311 Project 2: Sorting Pipes},
+  pdfsubject = {CS 311 Project 1},
+  pdfpagemode = UseNone
+}
+
+\begin{document}
+  \title{CS311 Project 2: Sorting Pipes}
+  \author{Robert M. Adams}
+  \maketitle
+
+
+\section{Design Decisions}
+
+
+
+
+\section{Difficulties}
+
+
+
+
+
+  \begin{figure}[p]
+    \centering
+    \input{plot.tex}
+%    \caption{number of words vs. runtimes. }
+    \label{runtimes}
+  \end{figure}
+
+
+\begin{table}[p]
+\centering
+    \begin{tabular}{ |l|l| }
+\hline
+        Date                           & Description                                                                  \\ \hline
+        Tue Feb 7 17:51:10 2012 -0800  &   added timing code, started writeup           \\
+        Tue Feb 7 14:00:36 2012 -0800 &     vector resizes                      \\
+        Mon Feb 6 23:59:49 2012 -0800  &     refactor into smaller methods             \\
+        Mon Feb 6 23:26:29 2012 -0800 &      Merge branch 'master' of github.com:adamsro/cs311-assign2-uniqify \\
+        Mon Feb 6 23:23:42 2012 -0800  &     added transform tolower for in string, added sort and supress functionality        \\
+        Sun Feb 5 17:02:37 2012 -0800   &   merge refactor to master \\
+        Sun Feb 5 16:09:32 2012 -0800   &   better exception handling. pipes not flushing correctly?        \\
+        Sun Feb 5 13:44:17 2012 -0800   &       refactored into class. sorts correctly, no suppressor       \\
+        Sat Feb 4 15:21:54 2012 -0800   &    fgets and fputs piped correctly. Correct output for suppressor. infinat fputs loop \\
+        Sat Feb 4 09:33:57 2012 -0800   &   working fdopen and fputs? broken fgets?     \\
+        Thu Feb 2 17:30:28 2012 -0800   &  vecotrs store pids and pipenums. need fdopen and suppress function.  \\
+        Wed Feb 1 23:19:15 2012 -0800   &   general structure. rough, does not compile.       \\
+        Fri Jan 27 18:03:51 2012 -0800  &       basic code for forking process      \\
+        Fri Jan 27 10:25:10 2012 -0800  &   Hello World!  \\
+\hline
+    \end{tabular}
+\caption{Pulled from git commit log.}\label{commit-logs}
+\end{table}
+
+
+\end{document}
