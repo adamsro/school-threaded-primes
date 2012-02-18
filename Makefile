@@ -1,7 +1,10 @@
-all: primes.o #pdf 
+all: primes.o #pdf
 
 primes.o:
-	g++ -ggdb3 -Wall primes.cpp -o primes 
+	g++ -ggdb3 -Wall -lpthread primes.cpp -o primes
+
+sieve.o:
+	g++ -ggdb3 -Wall -lpthread sieve.cpp -o sieve 
 
 clean:
 	rm -rf *o primes main.dvi main.ps main.pdf main.log main.aux main.out assign1.dSYM
@@ -13,7 +16,7 @@ default: pdf
 
 both: pdf html
 
-dvi: ${TARGET}.tex 
+dvi: ${TARGET}.tex
 #   run latex twice to get references correct
 	latex ${TARGET}.tex
 #   you can also have a bibtex line here
