@@ -1,9 +1,10 @@
-all: primes.o pdf 
+all: primes.o #pdf 
+
+primes.o:
+	g++ -ggdb3 -Wall primes.cpp -o primes 
 
 clean:
 	rm -rf *o primes main.dvi main.ps main.pdf main.log main.aux main.out assign1.dSYM
-primes.o:
-	g++ -ggdb3 -Wall primes.cpp -o primes 
 
 TARGET=main
 HTML=main_html
