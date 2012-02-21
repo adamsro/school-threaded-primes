@@ -14,97 +14,112 @@
  ******************************************************************************/
 #include <unistd.h>
 #include <pthread.h>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <fstream>
+#include <vector>
+
+#include <limits.h>    /* for CHAR_BIT */
+#include <stdint.h>   /* for uint32_t */
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
-#define NUM_THREADS  3
-#define TCOUNT 10
-#define COUNT_LIMIT 12
+/* for threads */
 
-int count = 0;
-pthread_mutex_t count_mutex;
-pthread_cond_t count_threshold_cv;
+struct thread_data {
+    int thread_id;
+    int max;
+    unsigned long testnum;
+};
 
-void *inc_count(void *t) {
-    int i;
-    long my_id = (long) t;
+/* for sieve */
+typedef uint32_t word_t;
+//enum {
+//    BITS_PER_WORD = sizeof (word_t) * CHAR_BIT
+//};
 
-    for (i = 0; i < TCOUNT; i++) {
-        pthread_mutex_lock(&count_mutex);
-        count++;
+enum {
+    BITS_PER_WORD = 16
+};
+#define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
+#define BIT_OFFSET(b)  ((b) % BITS_PER_WORD)
 
-        /*
-        Check the value of count and signal waiting thread when condition is
-        reached.  Note that this occurs while mutex is locked.
-         */
-        if (count == COUNT_LIMIT) {
-            printf("inc_count(): thread %ld, count = %d  Threshold reached. ",
-                    my_id, count);
-            pthread_cond_signal(&count_threshold_cv);
-            printf("Just sent signal.\n");
-        }
-        printf("inc_count(): thread %ld, count = %d, unlocking mutex\n",
-                my_id, count);
-        pthread_mutex_unlock(&count_mutex);
+/* get bit at x*/
+#define TEST(f,x)       *(f+WORD_OFFSET(x)) & (1 << (BIT_OFFSET(x)/2))
+/* set bit at x */
+#define SET(f,x)       *(f+WORD_OFFSET(x)) |= (1 << (BIT_OFFSET(x)/2))
+/* clear */
+#define CLEAR(f,x)       *(f+WORD_OFFSET(n)) &= ~(1 << BIT_OFFSET(n))
 
-        /* Do some work so threads can alternate on mutex lock */
-        sleep(1);
-    }
-    pthread_exit(NULL);
-}
+unsigned char *bitmap = NULL;
+unsigned long testnum = 1, max, mom, hits = 1, count;
 
-void *watch_count(void *t) {
-    long my_id = (long) t;
-
-    printf("Starting watch_count(): thread %ld\n", my_id);
-
-    /*
-    Lock mutex and wait for signal.  Note that the pthread_cond_wait routine
-    will automatically and atomically unlock mutex while it waits.
-    Also, note that if COUNT_LIMIT is reached before this routine is run by
-    the waiting thread, the loop will be skipped to prevent pthread_cond_wait
-    from never returning.
-     */
-    pthread_mutex_lock(&count_mutex);
-    if (count < COUNT_LIMIT) {
-        printf("watch_count(): thread %ld going into wait...\n", my_id);
-        pthread_cond_wait(&count_threshold_cv, &count_mutex);
-        printf("watch_count(): thread %ld Condition signal received.\n", my_id);
-        count += 125;
-        printf("watch_count(): thread %ld count now = %d.\n", my_id, count);
-    }
-    pthread_mutex_unlock(&count_mutex);
+void *set(void *threadarg) {
+    struct thread_data *my_data;
+    my_data = (struct thread_data *) threadarg;
+    for (mom = 3 * my_data->testnum; mom < my_data->max; mom += testnum << 1)
+        SET(bitmap, mom);
     pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
-    int i, rc;
-    long t1 = 1, t2 = 2, t3 = 3;
-    pthread_t threads[3];
+    time_t start;
+    time_t theend;
     pthread_attr_t attr;
+    //    long t1 = 1, t2 = 2, t3 = 3;
+    //    pthread_t threads[3];
 
-    /* Initialize mutex and condition variable objects */
-    pthread_mutex_init(&count_mutex, NULL);
-    pthread_cond_init(&count_threshold_cv, NULL);
+    (argc > 1) ? max = atol(argv[1]) : max = INT_MAX;
 
     /* For portability, explicitly create threads in a joinable state */
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_create(&threads[0], &attr, watch_count, (void *) t1);
-    pthread_create(&threads[1], &attr, inc_count, (void *) t2);
-    pthread_create(&threads[2], &attr, inc_count, (void *) t3);
+
+    bitmap = (unsigned char*) malloc(max >> 4);
+    if (bitmap == NULL) {
+        std::cout << "malloc failed";
+    }
+
+    printf("Searching prime numbers to: %ld", max);
+
+    std::vector<pthread_t> threads(999);
+    struct thread_data thread_data_array[999];
+    //std::vector<thread_data> thread_stuff();
+    start = clock();
+    int threadcount;
+    while ((testnum += 2) < max)
+        if (!TEST(bitmap, testnum)) {
+            thread_data_array[threadcount].testnum = testnum;
+            thread_data_array[threadcount].max = max;
+            pthread_create(&threads[threadcount],
+                    &attr, set, (void *) &thread_data_array[threadcount]);
+            ++threadcount;
+        }
+    theend = clock();
+    std::cout << (((double) (theend - start)) / CLOCKS_PER_SEC) << std::endl;
 
     /* Wait for all threads to complete */
-    for (i = 0; i < NUM_THREADS; i++) {
+    for (int i = 0; i < threadcount; i++) {
         pthread_join(threads[i], NULL);
     }
     printf("Main(): Waited on %d threads. Final value of count = %d. Done.\n",
-            NUM_THREADS, count);
+            threadcount, count);
+
+    /* This alg speeds things up by not checking even numbers,
+     * 2 however is an exception so it must be added to the output. */
+    printf("%d\t", 1);
+    printf("%d\t", 2);
+    count = 1;
+    while ((count += 2) < max)
+        if (!TEST(bitmap, count)) printf("%ld\t", count);
 
     /* Clean up and exit */
+    free(bitmap);
     pthread_attr_destroy(&attr);
-    pthread_mutex_destroy(&count_mutex);
-    pthread_cond_destroy(&count_threshold_cv);
     pthread_exit(NULL);
 
 }

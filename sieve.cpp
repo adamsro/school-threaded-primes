@@ -1,46 +1,70 @@
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <fstream>
+
+#include <limits.h>    /* for CHAR_BIT */
+#include <stdint.h>   /* for uint32_t */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#define TEST(f,x)	(*(f+(x)/16)&(1<<(((x)%16L)/2)))
-#define SET(f,x)	*(f+(x)/16)|=1<<(((x)%16L)/2)
+typedef uint32_t word_t;
 
-int
-main(int argc, char *argv[])
-{
-  unsigned char *feld=NULL, *zzz;
-  unsigned long teste=1, max, mom, hits=1, count, alloc, s=0, e=1;
-  time_t begin;
+//enum {
+//    BITS_PER_WORD = sizeof (word_t) * CHAR_BIT
+//};
 
-  if (argc > 1)
-    max = atol (argv[1]) + 10000;
-  else
-    max = 14010000L;
+enum {
+    BITS_PER_WORD = 16
+};
+#define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
+#define BIT_OFFSET(b)  ((b) % BITS_PER_WORD)
 
-  while (feld==NULL)
-        zzz = feld = (unsigned char*) malloc (alloc=(((max-=10000L)>>4)+1L));
+/* get bit at x*/
+#define TEST(f,x)       (*(f+WORD_OFFSET(x)) & (1 << (BIT_OFFSET(x)/2)))
+/* set bit at x */
+#define SET(f,x)       (*(f+WORD_OFFSET(x)) |= (1 << (BIT_OFFSET(x)/2)))
 
-  for (count=0; count<alloc; count++) *zzz++ = 0x00;
+int main(int argc, char *argv[]) {
+    unsigned char *bitmap = NULL;
+    unsigned long testnum = 1, max, mom, hits = 1, count;
+    time_t start;
+    time_t theend;
 
-  printf ("Searching prime numbers to : %ld\n", max);
+    (argc > 1) ? max = atol(argv[1]) : max = INT_MAX;
 
-  begin = time (NULL);
-  while ((teste+=2) < max)
-        if (!TEST(feld, teste)) {
-                if  (++hits%2000L==0) {printf (" %ld. prime number\x0d", hits); fflush(stdout);}
-                for (mom=3L*teste; mom<max; mom+=teste<<1) SET (feld, mom);
-                }
+    bitmap = (unsigned char*) malloc(max >> 4);
+    if (bitmap == NULL) {
+        std::cout << "malloc failed";
+        //throw (Exception("calloc failed", __LINE__, errno));
+    }
 
-  printf (" %ld prime numbers foundn %ld secs.\n\nShow prime numbers",
-          hits, time(NULL)-begin);
+    printf("Searching prime numbers to: %ld", max);
 
-  while (s<e) {
-        printf ("\n\nStart of Area : "); fflush (stdout); scanf ("%ld", &s);
-        printf ("End   of Area : ");     fflush (stdout); scanf ("%ld", &e);
-
-        count=s-2; if (s%2==0) count++;
-        while ((count+=2)<e) if (!TEST(feld,count)) printf ("%ld\t", count);
+    start = clock();
+    while ((testnum += 2) < max)
+        if (!TEST(bitmap, testnum)) {
+            if (++hits % 2000L == 0) {
+                printf(" %ld. prime number\x0d", hits);
+                fflush(stdout);
+            }
+            for (mom = 3 * testnum; mom < max; mom += testnum << 1)
+                SET(bitmap, mom);
         }
-  free (feld);
-  return 0;
+    theend = clock();
+    std::cout << (((double) (theend - start)) / CLOCKS_PER_SEC) << std::endl;
+
+    /* This alg speeds things up by not checking even numbers,
+     * 2 however is an exception so it must be added to the output. */
+    printf("%d\t", 1);
+    printf("%d\t", 2);
+    count = 1;
+    while ((count += 2) < max)
+        if (!TEST(bitmap, count)) printf("%ld\t", count);
+
+    free(bitmap);
+    return 0;
 }
