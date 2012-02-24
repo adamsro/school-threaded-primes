@@ -29,18 +29,9 @@
 #include <stdlib.h>
 #include <time.h>
 
-/* for threads */
-
-struct thread_data {
-    pthread_t thread_id;
-    unsigned long max;
-    unsigned long testnum;
-};
-
-/* for sieve */
-typedef uint32_t word_t;
+//typedef uint32_t word_t;
 //enum {
-//    BITS_PER_WORD = sizeof (word_t) * CHAR_BIT
+//    BITS_PER_WORD = sizeof (word_t) * CHAR_BIT // need to revise calc
 //};
 
 enum {
@@ -49,100 +40,107 @@ enum {
 #define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
 #define BIT_OFFSET(b)  ((b) % BITS_PER_WORD)
 
-/* is bit == 1? */
-#define TEST(f,x)       *(f+WORD_OFFSET(x)) & (1 << (BIT_OFFSET(x)/2))
-/* set bit at x to 1*/
-#define SET(f,x)       *(f+WORD_OFFSET(x)) |= (1 << (BIT_OFFSET(x)/2))
-/* invert bit */
-#define CLEAR(f,x)       *(f+WORD_OFFSET(n)) &= ~(1 << (BIT_OFFSET(n)/2))
+/* return true if bit = 0 */
+#define TEST(f,x)       (f[WORD_OFFSET(x)] & (1 << (BIT_OFFSET(x)/2)))
+/* set bit at x to 0 */
+#define SET(f,x)       (f[WORD_OFFSET(x)] |= (1 << (BIT_OFFSET(x)/2)))
+
+/* Global variables since they are shared amoung threads */
+unsigned char *bitmap = NULL;
+pthread_mutex_t mutex;
+pthread_cond_t prime_found;
+unsigned long last_prime;
+unsigned long max;
+
+void test_print() {
+    unsigned long j = 1;
+    std::cout << "\n";
+    while ((j += 2) < max)
+        (!TEST(bitmap, j)) ? std::cout << "1" : std::cout << "0";
+    std::cout << "\n";
+}
 
 void *set(void *threadarg) {
     unsigned long mom;
-    struct thread_data *my_data;
-    my_data = (struct thread_data *) threadarg;
-    printf("my_data->testnum: %ld\n", my_data->testnum);
-    for (mom = 3 * my_data->testnum; mom < my_data->max; mom += my_data->testnum << 1) {
-        //©SET(bitmap, mom);
+    unsigned long testnum;
+
+    pthread_mutex_lock(&mutex);
+    pthread_cond_wait(&prime_found, &mutex);
+    testnum = last_prime;
+    std::cout << testnum;
+    for (mom = 3 * testnum; mom < max; mom += testnum << 1) {
+        SET(bitmap, mom);
     }
+    pthread_mutex_unlock(&mutex);
+
     pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
-
     time_t start;
     time_t theend;
     pthread_attr_t attr;
-    unsigned long testnum = 1;
-    unsigned long max;
     unsigned long j;
+    unsigned long upperlim;
+    unsigned long testnum = 1;
+    int num_threads;
     int rc;
     int hits = 1;
-    int num_threads;
-    unsigned long upperlim;
-    unsigned char *bitmap = NULL;
 
     (argc > 1) ? num_threads = atol(argv[1]) : num_threads = 3;
-
-    upperlim = sqrt(max);
     // at 2^32 or set to INT_MAX
     (argc > 2) ? max = atol(argv[2]) : max = 4294967296;
+    upperlim = sqrt(max);
 
-    //pthread_t threads[num_threads];
-    struct thread_data thread_data_array[num_threads];
+    pthread_t threads[num_threads];
+    //struct thread_data thread_data_array[num_threads];
 
     /* For portability, explicitly create threads in a joinable state */
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&prime_found, NULL);
 
-    //bitmap = (unsigned char*) malloc(max >> 4);
     bitmap = (unsigned char*) calloc(max, 4);
     if (bitmap == NULL) {
         std::cout << "malloc failed";
     }
 
+    test_print();
+
     std::cout << "Searching prime numbers to: " << max << std::endl;
-    //printf("Searching prime numbers to: %ld", max);
-    j = 1;
-    while ((j += 2) < 100)
-        (!TEST(bitmap, j)) ? std::cout << "1" : std::cout << "0";
-    std::cout << "\n";
-    SET(bitmap, 3);
-    j = 1;
-    while ((j += 2) < 100)
-        (!TEST(bitmap, j)) ? std::cout << "1" : std::cout << "0";
-    std::cout << "\n";
 
     start = clock();
+    /* spawn all threads */
     for (int k; k < num_threads; ++num_threads) {
-        pthread_create(&thread_data_array[k].thread_id,
-                &attr, set, (void *) &thread_data_array[k]);
+        pthread_create(&threads[k], &attr, set, (void *) threads[k]);
     }
-    unsigned long mom;
+    /* when loop hits a 1 (not yet flagged as not prime) its assumed
+     *  prime and a thread is started which will mark all multiples as non prime. */
     while ((testnum += 2) <= upperlim) {
         if (!TEST(bitmap, testnum)) {
-            thread_data_array[hits].testnum = testnum;
-            thread_data_array[hits].max = max;
-            //thread_data_array[hits].bitmap = bitmap;
-            for (mom = 3 * testnum; mom < max; mom += testnum << 1)
-                SET(bitmap, mom);
+            last_prime = testnum;
+            pthread_cond_broadcast(&prime_found);
             ++hits;
         }
     }
 
-
     /* Wait for all threads to complete */
-    for (int i = 0; i < hits; ++i) {
-        rc = pthread_join(thread_data_array[i].thread_id, NULL);
+    for (int i = 0; i < num_threads; ++i) {
+        rc = pthread_join(threads[i], NULL);
         if (rc) {
             printf("ERROR; return code from pthread_join() is %d\n", rc);
             exit(-1);
         }
     }
     theend = clock();
+
     std::cout << "Main(): Waited on " << hits << " threads." << std::endl;
     std::cout << "found " << hits << "in ";
     std::cout << (((double) (theend - start)) / CLOCKS_PER_SEC);
     std::cout << " seconds" << std::endl;
+
+    test_print();
 
     /* This alg speeds things up by not checking even numbers,
      * 2 however is an exception so it must be added to the output. */
@@ -156,6 +154,8 @@ int main(int argc, char *argv[]) {
     /* Clean up and exit */
     free(bitmap);
     pthread_attr_destroy(&attr);
+    pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&prime_found);
     pthread_exit(NULL);
 
 }
