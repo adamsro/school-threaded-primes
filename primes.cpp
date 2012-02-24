@@ -35,7 +35,6 @@ struct thread_data {
     pthread_t thread_id;
     unsigned long max;
     unsigned long testnum;
-    //   unsigned char *bitmap;
 };
 
 /* for sieve */
@@ -50,20 +49,12 @@ enum {
 #define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
 #define BIT_OFFSET(b)  ((b) % BITS_PER_WORD)
 
-/* get bit at x*/
+/* is bit == 1? */
 #define TEST(f,x)       *(f+WORD_OFFSET(x)) & (1 << (BIT_OFFSET(x)/2))
-/* set bit at x */
+/* set bit at x to 1*/
 #define SET(f,x)       *(f+WORD_OFFSET(x)) |= (1 << (BIT_OFFSET(x)/2))
-/* clear */
-#define CLEAR(f,x)       *(f+WORD_OFFSET(n)) &= ~(1 << BIT_OFFSET(n))
-
-//class Sieve {
-//public:
-//    unsigned long max;
-//    *set(void *threadarg);
-//    run();
-//protected:
-//};
+/* invert bit */
+#define CLEAR(f,x)       *(f+WORD_OFFSET(n)) &= ~(1 << (BIT_OFFSET(n)/2))
 
 void *set(void *threadarg) {
     unsigned long mom;
@@ -71,13 +62,13 @@ void *set(void *threadarg) {
     my_data = (struct thread_data *) threadarg;
     printf("my_data->testnum: %ld\n", my_data->testnum);
     for (mom = 3 * my_data->testnum; mom < my_data->max; mom += my_data->testnum << 1) {
-        //SET(my_data->bitmap, mom);
+        //©SET(bitmap, mom);
     }
     pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
-    unsigned char *bitmap = NULL;
+
     time_t start;
     time_t theend;
     pthread_attr_t attr;
@@ -86,12 +77,18 @@ int main(int argc, char *argv[]) {
     unsigned long j;
     int rc;
     int hits = 1;
+    int num_threads;
     unsigned long upperlim;
-    struct thread_data thread_data_array[999];
+    unsigned char *bitmap = NULL;
 
-    (argc > 1) ? max = atol(argv[1]) : max = INT_MAX;
+    (argc > 1) ? num_threads = atol(argv[1]) : num_threads = 3;
 
     upperlim = sqrt(max);
+    // at 2^32 or set to INT_MAX
+    (argc > 2) ? max = atol(argv[2]) : max = 4294967296;
+
+    //pthread_t threads[num_threads];
+    struct thread_data thread_data_array[num_threads];
 
     /* For portability, explicitly create threads in a joinable state */
     pthread_attr_init(&attr);
@@ -105,15 +102,29 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Searching prime numbers to: " << max << std::endl;
     //printf("Searching prime numbers to: %ld", max);
+    j = 1;
+    while ((j += 2) < 100)
+        (!TEST(bitmap, j)) ? std::cout << "1" : std::cout << "0";
+    std::cout << "\n";
+    SET(bitmap, 3);
+    j = 1;
+    while ((j += 2) < 100)
+        (!TEST(bitmap, j)) ? std::cout << "1" : std::cout << "0";
+    std::cout << "\n";
 
     start = clock();
+    for (int k; k < num_threads; ++num_threads) {
+        pthread_create(&thread_data_array[k].thread_id,
+                &attr, set, (void *) &thread_data_array[k]);
+    }
+    unsigned long mom;
     while ((testnum += 2) <= upperlim) {
         if (!TEST(bitmap, testnum)) {
             thread_data_array[hits].testnum = testnum;
             thread_data_array[hits].max = max;
             //thread_data_array[hits].bitmap = bitmap;
-            pthread_create(&thread_data_array[hits].thread_id,
-                    &attr, set, (void *) &thread_data_array[hits]);
+            for (mom = 3 * testnum; mom < max; mom += testnum << 1)
+                SET(bitmap, mom);
             ++hits;
         }
     }
