@@ -1,4 +1,4 @@
-all: primes.o sieve.o  sieve_orig.o #pdf
+all: primes.o sieve.o  pthread_orig.o #pdf
 
 primes.o:
 	g++ -ggdb3 -Wall -lpthread primes.cpp -o primes
@@ -6,8 +6,8 @@ primes.o:
 sieve.o:
 	g++ -ggdb3 -Wall -lpthread sieve.cpp -o sieve 
 
-sieve_orig.o:
-	g++ -ggdb3 -Wall -lpthread sieve_orig.cpp -o sieve_orig 
+pthread_orig.o:
+	g++ -ggdb3 -Wall -lpthread pthread_orig.cpp -o pthread_orig
 
 clean:
 	rm -rf *o primes main.dvi main.ps main.pdf main.log main.aux main.out assign1.dSYM

@@ -1,161 +1,127 @@
-/******************************************************************************
- * FILE: condvar.c
- * DESCRIPTION:
- *   Example code for using Pthreads condition variables.  The main thread
- *   creates three threads.  Two of those threads increment a "count" variable,
- *   while the third thread watches the value of "count".  When "count"
- *   reaches a predefined limit, the waiting thread is signaled by one of the
- *   incrementing threads. The waiting thread "awakens" and then modifies
- *   count. The program continues until the incrementing threads reach
- *   TCOUNT. The main program prints the final value of count.
- * SOURCE: Adapted from example code in "Pthreads Programming", B. Nichols
- *   et al. O'Reilly and Associates.
- * LAST REVISED: 07/16/09  Blaise Barney
- ******************************************************************************/
-#include <unistd.h>
-#include <pthread.h>
-#include <cerrno>
+
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
-#include <fstream>
-#include <vector>
-#include <math.h>
 
-#include <limits.h>    /* for CHAR_BIT */
-#include <stdint.h>   /* for uint32_t */
-
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <time.h>
+#include <math.h>
 
-//typedef uint32_t word_t;
-//enum {
-//    BITS_PER_WORD = sizeof (word_t) * CHAR_BIT // need to revise calc
-//};
+#define NUM_THREADS  3
 
-enum {
-    BITS_PER_WORD = 16
-};
+#define BITS_PER_WORD 16
 #define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
 #define BIT_OFFSET(b)  ((b) % BITS_PER_WORD)
-
 /* return true if bit = 0 */
 #define TEST(f,x)       (f[WORD_OFFSET(x)] & (1 << (BIT_OFFSET(x)/2)))
 /* set bit at x to 0 */
 #define SET(f,x)       (f[WORD_OFFSET(x)] |= (1 << (BIT_OFFSET(x)/2)))
 
-/* Global variables since they are shared amoung threads */
+pthread_mutex_t count_mutex;
+pthread_cond_t count_threshold_cv;
 unsigned char *bitmap = NULL;
-pthread_mutex_t mutex;
-pthread_cond_t prime_found;
 unsigned long last_prime;
 unsigned long max;
+int num_threads;
+int hits = 1;
 
-void test_print() {
-    unsigned long j = 1;
-    std::cout << "\n";
-    while ((j += 2) < max)
-        (!TEST(bitmap, j)) ? std::cout << "1" : std::cout << "0";
-    std::cout << "\n";
-}
+void *get_primes(void *t) {
+    long my_id = (long) t;
+    unsigned long testnum = 1;
+    unsigned long upperlim;
+    upperlim = sqrt(max);
 
-void *set(void *threadarg) {
-    unsigned long mom;
-    unsigned long testnum;
-
-    pthread_mutex_lock(&mutex);
-    pthread_cond_wait(&prime_found, &mutex);
-    testnum = last_prime;
-    std::cout << testnum;
-    for (mom = 3 * testnum; mom < max; mom += testnum << 1) {
-        SET(bitmap, mom);
+    /*
+    Check the value of count and signal waiting thread when condition is
+    reached.  Note that this occurs while mutex is locked.
+     */
+    while ((testnum += 2) <= upperlim) {
+        if (!TEST(bitmap, testnum)) {
+            pthread_mutex_lock(&count_mutex);
+            last_prime = testnum;
+            pthread_cond_signal(&count_threshold_cv);
+            printf("Just sent signal.\n");
+            pthread_mutex_unlock(&count_mutex);
+            ++hits;
+        }
+        /* Do some work so threads can alternate on mutex lock */
+        sleep(1);
     }
-    pthread_mutex_unlock(&mutex);
+
+
 
     pthread_exit(NULL);
 }
 
+void *mark_not_prime(void *t) {
+    long my_id = (long) t;
+
+    printf("Starting watch_count(): thread %ld\n", my_id);
+
+    /*
+    Lock mutex and wait for signal.  Note that the pthread_cond_wait routine
+    will automatically and atomically unlock mutex while it waits.
+    Also, note that if COUNT_LIMIT is reached before this routine is run by
+    the waiting thread, the loop will be skipped to prevent pthread_cond_wait
+    from never returning.
+     */
+    pthread_mutex_lock(&count_mutex);
+    unsigned long mom;
+    unsigned long testnum;
+
+    printf("watch_count(): thread %ld going into wait...\n", my_id);
+    pthread_cond_wait(&count_threshold_cv, &count_mutex);
+    printf("watch_count(): thread %ld Condition signal received.\n", my_id);
+    testnum = last_prime;
+    std::cout << "got prime: " << testnum << std::endl;
+    for (mom = 3 * testnum; mom < max; mom += testnum << 1) {
+        SET(bitmap, mom);
+    }
+
+    pthread_mutex_unlock(&count_mutex);
+    pthread_exit(NULL);
+}
+
 int main(int argc, char *argv[]) {
-    time_t start;
-    time_t theend;
+    int i;
+    long t1 = 1, t2 = 2, t3 = 3;
+    pthread_t threads[3];
     pthread_attr_t attr;
-    unsigned long j;
-    unsigned long upperlim;
-    unsigned long testnum = 1;
-    int num_threads;
-    int rc;
-    int hits = 1;
 
     (argc > 1) ? num_threads = atol(argv[1]) : num_threads = 3;
     // at 2^32 or set to INT_MAX
     (argc > 2) ? max = atol(argv[2]) : max = 4294967296;
-    upperlim = sqrt(max);
-
-    pthread_t threads[num_threads];
-    //struct thread_data thread_data_array[num_threads];
-
-    /* For portability, explicitly create threads in a joinable state */
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_mutex_init(&mutex, NULL);
-    pthread_cond_init(&prime_found, NULL);
 
     bitmap = (unsigned char*) calloc(max, 4);
     if (bitmap == NULL) {
         std::cout << "malloc failed";
     }
 
-    test_print();
+    /* Initialize mutex and condition variable objects */
+    pthread_mutex_init(&count_mutex, NULL);
+    pthread_cond_init(&count_threshold_cv, NULL);
 
-    std::cout << "Searching prime numbers to: " << max << std::endl;
-
-    start = clock();
-    /* spawn all threads */
-    for (int k; k < num_threads; ++num_threads) {
-        pthread_create(&threads[k], &attr, set, (void *) threads[k]);
-    }
-    /* when loop hits a 1 (not yet flagged as not prime) its assumed
-     *  prime and a thread is started which will mark all multiples as non prime. */
-    while ((testnum += 2) <= upperlim) {
-        if (!TEST(bitmap, testnum)) {
-            last_prime = testnum;
-            pthread_cond_broadcast(&prime_found);
-            ++hits;
-        }
-    }
+    /* For portability, explicitly create threads in a joinable state */
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pthread_create(&threads[0], &attr, mark_not_prime, (void *) t1);
+    pthread_create(&threads[0], &attr, mark_not_prime, (void *) t2);
+    pthread_create(&threads[1], &attr, get_primes, (void *) t3);
 
     /* Wait for all threads to complete */
-    for (int i = 0; i < num_threads; ++i) {
-        rc = pthread_join(threads[i], NULL);
-        if (rc) {
-            printf("ERROR; return code from pthread_join() is %d\n", rc);
-            exit(-1);
-        }
+    for (i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
     }
-    theend = clock();
+    printf("Main(): Waited on %d threads. Done.\n",
+            NUM_THREADS);
 
-    std::cout << "Main(): Waited on " << hits << " threads." << std::endl;
-    std::cout << "found " << hits << "in ";
-    std::cout << (((double) (theend - start)) / CLOCKS_PER_SEC);
-    std::cout << " seconds" << std::endl;
-
-    test_print();
-
-    /* This alg speeds things up by not checking even numbers,
-     * 2 however is an exception so it must be added to the output. */
-    printf("%d\t", 1);
-    printf("%d\t", 2);
-    j = 1;
-    while ((j += 2) < max)
-        if (!TEST(bitmap, j)) printf("%ld\t", j);
-
-    std::cout << std::endl;
     /* Clean up and exit */
-    free(bitmap);
     pthread_attr_destroy(&attr);
-    pthread_mutex_destroy(&mutex);
-    pthread_cond_destroy(&prime_found);
+    pthread_mutex_destroy(&count_mutex);
+    pthread_cond_destroy(&count_threshold_cv);
     pthread_exit(NULL);
 
 }
