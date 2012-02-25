@@ -18,8 +18,9 @@
 /* set bit at x to 0 */
 #define SET(f,x)       (f[WORD_OFFSET(x)] |= (1 << (BIT_OFFSET(x)/2)))
 
-pthread_mutex_t count_mutex;
-pthread_cond_t count_threshold_cv;
+pthread_mutex_t prime_mutex;
+pthread_cond_t found_prime;
+pthread_cond_t prime_processed;
 unsigned char *bitmap = NULL;
 unsigned long last_prime;
 unsigned long max;
@@ -32,19 +33,19 @@ void *mark_not_prime(void *t) {
     long my_id = (long) t;
     unsigned long mom;
     unsigned long testnum;
-    printf("Starting mark_not_prime(): thread %ld\n", my_id);
-
-    while (testnum < max) {
-        pthread_mutex_lock(&count_mutex);
+    //printf("Starting mark_not_prime(): thread %ld\n", my_id);
+    while (true) {
+        pthread_mutex_lock(&prime_mutex);
         printf("mark_not_prime(): thread %ld going into wait...\n", my_id);
-        pthread_cond_wait(&count_threshold_cv, &count_mutex);
+        pthread_cond_wait(&found_prime, &prime_mutex);
         printf("mark_not_prime(): thread %ld Condition signal received.\n", my_id);
         testnum = last_prime;
         std::cout << "got prime: " << testnum << std::endl;
         for (mom = 3 * testnum; mom < max; mom += testnum << 1) {
             SET(bitmap, mom);
         }
-        pthread_mutex_unlock(&count_mutex);
+        pthread_cond_signal(&prime_processed);
+        pthread_mutex_unlock(&prime_mutex);
     }
     printf("Ending mark_not_prime(): thread %ld\n", my_id);
     pthread_exit(NULL);
@@ -72,8 +73,9 @@ int main(int argc, char *argv[]) {
     }
 
     /* Initialize mutex and condition variable objects */
-    pthread_mutex_init(&count_mutex, NULL);
-    pthread_cond_init(&count_threshold_cv, NULL);
+    pthread_mutex_init(&prime_mutex, NULL);
+    pthread_cond_init(&found_prime, NULL);
+    pthread_cond_init(&prime_processed, NULL);
 
     /* For portability, explicitly create threads in a joinable state */
     pthread_attr_init(&attr);
@@ -81,7 +83,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < num_threads; ++i) {
         pthread_create(&threads[i], &attr, mark_not_prime, (void *) thread_ids[i]);
     }
-    //pthread_create(&threads[1], &attr, get_primes, (void *) t3);
     sleep(1);
     /*
     Check the value of count and signal waiting thread when condition is
@@ -89,19 +90,21 @@ int main(int argc, char *argv[]) {
      */
     testnum = 1;
     while ((testnum += 2) < max) {
-        pthread_mutex_lock(&count_mutex);
+        pthread_mutex_lock(&prime_mutex);
         if (!TEST(bitmap, testnum)) {
             last_prime = testnum;
-            pthread_cond_signal(&count_threshold_cv);
+            pthread_cond_signal(&found_prime);
             printf("Just sent signal.\n");
             ++hits;
+            pthread_cond_wait(&prime_processed, &prime_mutex);
         }
-        pthread_mutex_unlock(&count_mutex);
+        pthread_mutex_unlock(&prime_mutex);
         /* Do some work so threads can alternate on mutex lock */
-        sleep(1);
+        //sleep(1);
     }
 
     /* Wait for all threads to complete */
+    //pthread_mutex_unlock(&count_mutex);
     for (int i = 0; i < num_threads; i++) {
         pthread_join(threads[i], NULL);
     }
@@ -110,8 +113,9 @@ int main(int argc, char *argv[]) {
 
     /* Clean up and exit */
     pthread_attr_destroy(&attr);
-    pthread_mutex_destroy(&count_mutex);
-    pthread_cond_destroy(&count_threshold_cv);
+    pthread_mutex_destroy(&prime_mutex);
+    pthread_cond_destroy(&found_prime);
+    pthread_cond_destroy(&prime_processed);
     pthread_exit(NULL);
 
 }
