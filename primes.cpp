@@ -28,16 +28,16 @@ unsigned long max;
 int num_threads;
 int hits = 1;
 
+/*
+    Check the value of count and signal waiting thread when condition is
+    reached.  Note that this occurs while mutex is locked.
+     */
 void *get_primes(void *t) {
     long my_id = (long) t;
     unsigned long testnum = 1;
     unsigned long upperlim;
+    printf("Starting get_primes(): thread %ld\n", my_id);
     upperlim = sqrt(max);
-
-    /*
-    Check the value of count and signal waiting thread when condition is
-    reached.  Note that this occurs while mutex is locked.
-     */
     while ((testnum += 2) <= upperlim) {
         if (!TEST(bitmap, testnum)) {
             pthread_mutex_lock(&count_mutex);
@@ -50,6 +50,7 @@ void *get_primes(void *t) {
         /* Do some work so threads can alternate on mutex lock */
         sleep(1);
     }
+    printf("Ending get_primes(): thread %ld\n", my_id);
 
 
 
@@ -58,29 +59,20 @@ void *get_primes(void *t) {
 
 void *mark_not_prime(void *t) {
     long my_id = (long) t;
-
-    printf("Starting watch_count(): thread %ld\n", my_id);
-
-    /*
-    Lock mutex and wait for signal.  Note that the pthread_cond_wait routine
-    will automatically and atomically unlock mutex while it waits.
-    Also, note that if COUNT_LIMIT is reached before this routine is run by
-    the waiting thread, the loop will be skipped to prevent pthread_cond_wait
-    from never returning.
-     */
-    pthread_mutex_lock(&count_mutex);
     unsigned long mom;
     unsigned long testnum;
 
-    printf("watch_count(): thread %ld going into wait...\n", my_id);
+    printf("Starting mark_not_prime(): thread %ld\n", my_id);
+    pthread_mutex_lock(&count_mutex);
+    printf("mark_not_prime(): thread %ld going into wait...\n", my_id);
     pthread_cond_wait(&count_threshold_cv, &count_mutex);
-    printf("watch_count(): thread %ld Condition signal received.\n", my_id);
+    printf("mark_not_prime(): thread %ld Condition signal received.\n", my_id);
     testnum = last_prime;
     std::cout << "got prime: " << testnum << std::endl;
     for (mom = 3 * testnum; mom < max; mom += testnum << 1) {
         SET(bitmap, mom);
     }
-
+    printf("Ending mark_not_prime(): thread %ld\n", my_id);
     pthread_mutex_unlock(&count_mutex);
     pthread_exit(NULL);
 }
