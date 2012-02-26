@@ -2,14 +2,9 @@
 /*
  * Original Author: Robert M Adams (adamsro)
  * File: uniqify.cpp
- * Created: 2012 Feb 1, 18:35 by adamsro
- * Last Modified: 2012 Feb 7, 20:00 by adamsro
+ * Created: 2012 Feb 15, 18:35 by adamsro
+ * Last Modified: 2012 Feb 26, 20:00 by adamsro
  *
- * File contains a filter which spawns n sort processses based on a command
- * line argument. The primary purpose of this is project to learn pipes.
- *
- * helpful: http://tldp.org/LDP/lpg/node11.html
- * and: http://stackoverflow.com/questions/1381089/multiple-fork-concurrency
  */
 
 #include <cstdio>
@@ -75,52 +70,63 @@ int main(int argc, char *argv[]) {
     (argc > 2) ? max = atol(argv[2]) : max = 4294967296;
     //upperlim = sqrt(max);
 
-    pthread_t threads[num_threads];
-    long thread_ids[num_threads];
-    for (int i = 0; i < num_threads; ++i) {
-        thread_ids[i] = i + 1;
+    for (unsigned long mx = 2; mx <= 4294967296; mx = mx * 2) {
+        for (unsigned long food = 1; food <= 8; ++food) {
+            max = mx;
+            num_threads = food;
+
+            pthread_t threads[num_threads];
+            long thread_ids[num_threads];
+            for (int i = 0; i < num_threads; ++i) {
+                thread_ids[i] = i + 1;
+            }
+            bitmap = (unsigned char*) calloc(max, 4);
+            if (bitmap == NULL) {
+                std::cout << "malloc failed";
+            }
+            /* For portability, explicitly create threads in a joinable state */
+            pthread_attr_init(&attr);
+            pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+            //std::cout << "Searching for primes 0 to " << max << "\n";
+
+            start = clock();
+            testnum = 1;
+            hits = 1;
+            for (int i = 0; i < num_threads; ++i) {
+                pthread_create(&threads[i], &attr, mark_not_prime, (void *) thread_ids[i]);
+            }
+            while (finished_threads < num_threads) {
+                ; /* until all threads are complete */
+            }
+            for (int i = 0; i < num_threads; i++) {
+                pthread_join(threads[i], NULL);
+            }
+            theend = clock();
+
+            unsigned long k = 1;
+            while ((k += 2) < max)
+                if (!TEST(bitmap, k)) ++hits;
+
+            ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+            total_time = (((double) (theend - start)) / (double) CLOCKS_PER_SEC);
+            /* algorithm skips primes 1 and 2, so add them to the count */
+            //            std::cout << "Found " << hits + 2 << " primes.\n";
+            //            printf("Total time using %d threads : %.6f seconds\n",
+            //  num_threads, total_time / (num_threads < ncpus ? num_threads : ncpus));
+            // for gnuplot
+            printf("%ld %.6f ", max, total_time / (num_threads < ncpus ? num_threads : ncpus));
+            std::cout << num_threads << "\n";
+
+            //print_primes();
+
+            /* Clean up and exit */
+            free(bitmap);
+            pthread_attr_destroy(&attr);
+        }
+        sleep(1);
     }
-    bitmap = (unsigned char*) calloc(max, 4);
-    if (bitmap == NULL) {
-        std::cout << "malloc failed";
-    }
-    /* For portability, explicitly create threads in a joinable state */
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-    std::cout << "Searching for primes 1 to " << max << "\n";
-
-    start = clock();
-    testnum = 1;
-    hits = 1;
-    for (int i = 0; i < num_threads; ++i) {
-        pthread_create(&threads[i], &attr, mark_not_prime, (void *) thread_ids[i]);
-    }
-    while (finished_threads < num_threads) {
-        ; /* until all threads are complete */
-    }
-    for (int i = 0; i < num_threads; i++) {
-        pthread_join(threads[i], NULL);
-    }
-    theend = clock();
-
-    unsigned long k = 1;
-    while ((k += 2) < max)
-        if (!TEST(bitmap, k)) ++hits;
-
-    ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-    /* algorithm skips primes 1 and 2, so add them to the count */
-    std::cout << "Found " << hits + 2 << " primes.\n";
-    total_time = (((double) (theend - start)) / (double) CLOCKS_PER_SEC);
-    printf("Total time using %d threads : %.6f seconds\n",
-            num_threads, total_time / (num_threads < ncpus ? num_threads : ncpus));
-
-    //print_primes();
-
-    /* Clean up and exit */
-    pthread_attr_destroy(&attr);
     pthread_exit(NULL);
-
 }
 
 
