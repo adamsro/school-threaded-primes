@@ -112,8 +112,8 @@ int main(int argc, char *argv[]) {
             total_time = (((double) (theend - start)) / (double) CLOCKS_PER_SEC);
 
             printf("%ld\t",max);
-            printf("%.6f\t", total_time / (num_threads < ncpus ? num_threads : ncpus));
             printf("%d\n" ,num_threads);
+            printf("%.6f\t", total_time / (num_threads < ncpus ? num_threads : ncpus));
 
             //print_primes();
 
