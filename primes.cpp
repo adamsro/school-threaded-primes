@@ -32,10 +32,10 @@
 
 unsigned char *bitmap = NULL;
 unsigned long max;
-int hits = 1;
+unsigned long hits;
 int num_threads;
 int finished_threads; /* indicates that all threads are complete */
-unsigned long testnum = 1;
+unsigned long testnum;
 
 void *mark_not_prime(void *t) {
     unsigned long mom;
@@ -51,6 +51,16 @@ void *mark_not_prime(void *t) {
     }
     ++finished_threads; /* indicate thread is complete */
     pthread_exit(NULL);
+}
+
+void print_primes() {
+    /* This alg speeds things up by not checking even numbers,
+     * 2 however is an exception so it must be added to the output. */
+    printf("%d\t", 1);
+    printf("%d\t", 2);
+    unsigned long k = 1;
+    while ((k += 2) < max)
+        if (!TEST(bitmap, k)) std::cout << k << "\t";
 }
 
 int main(int argc, char *argv[]) {
@@ -78,9 +88,11 @@ int main(int argc, char *argv[]) {
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-    std::cout << "Searching for " << max << " primes. \n";
+    std::cout << "Searching for primes 1 to " << max << "\n";
 
     start = clock();
+    testnum = 1;
+    hits = 1;
     for (int i = 0; i < num_threads; ++i) {
         pthread_create(&threads[i], &attr, mark_not_prime, (void *) thread_ids[i]);
     }
@@ -100,17 +112,10 @@ int main(int argc, char *argv[]) {
     /* algorithm skips primes 1 and 2, so add them to the count */
     std::cout << "Found " << hits + 2 << " primes.\n";
     total_time = (((double) (theend - start)) / (double) CLOCKS_PER_SEC);
-    printf ("Total time using %d threads : %.6f seconds\n",
-	        num_threads, total_time / (num_threads < ncpus ? num_threads : ncpus));
+    printf("Total time using %d threads : %.6f seconds\n",
+            num_threads, total_time / (num_threads < ncpus ? num_threads : ncpus));
 
-    /* This alg speeds things up by not checking even numbers,
-     * 2 however is an exception so it must be added to the output.
-    printf("%d\t", 1);
-    printf("%d\t", 2);
-    k = 1;
-    while ((k += 2) < max)
-        if (!TEST(bitmap, k)) std::cout << k << "\t";
-     * */
+    //print_primes();
 
     /* Clean up and exit */
     pthread_attr_destroy(&attr);
