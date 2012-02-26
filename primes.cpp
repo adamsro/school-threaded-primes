@@ -35,11 +35,11 @@ unsigned long max;
 int hits = 1;
 int num_threads;
 int finished_threads; /* indicates that all threads are complete */
+unsigned long testnum = 1;
 
 void *mark_not_prime(void *t) {
-    //long my_id = (long) t;
     unsigned long mom;
-    unsigned long testnum = 1;
+    //long my_id = (long) t;
     /* search untill sqrt(n) */
     while (testnum * testnum <= max) {
         testnum += 2;
@@ -57,6 +57,8 @@ int main(int argc, char *argv[]) {
     pthread_attr_t attr;
     time_t start;
     time_t theend;
+    long ncpus;
+    double total_time;
 
     (argc > 1) ? num_threads = atol(argv[1]) : num_threads = 8;
     // at 2^32 or set to INT_MAX
@@ -94,17 +96,18 @@ int main(int argc, char *argv[]) {
     while ((k += 2) < max)
         if (!TEST(bitmap, k)) ++hits;
 
-    printf("Main(): Waited on %d threads. Done.\n", num_threads);
+    ncpus = sysconf(_SC_NPROCESSORS_ONLN);
     /* algorithm skips primes 1 and 2, so add them to the count */
-    std::cout << "found " << hits + 2 << " in ";
-    std::cout << (((double) (theend - start)) / CLOCKS_PER_SEC);
-    std::cout << " seconds" << std::endl;
+    std::cout << "Found " << hits + 2 << " primes.\n";
+    total_time = (((double) (theend - start)) / (double) CLOCKS_PER_SEC);
+    printf ("Total time using %d threads : %.6f seconds\n",
+	        num_threads, total_time / (num_threads < ncpus ? num_threads : ncpus));
 
     /* This alg speeds things up by not checking even numbers,
      * 2 however is an exception so it must be added to the output.
     printf("%d\t", 1);
     printf("%d\t", 2);
-    unsigned long k = 1;
+    k = 1;
     while ((k += 2) < max)
         if (!TEST(bitmap, k)) std::cout << k << "\t";
      * */
