@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
-#include <math.h>
 
 #define BITS_PER_WORD 16
 #define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
@@ -33,17 +32,18 @@
 
 unsigned char *bitmap = NULL;
 unsigned long max;
-int num_threads;
 int hits = 1;
+int num_threads;
 int finished_threads; /* indicates that all threads are complete */
 
 void *mark_not_prime(void *t) {
     //long my_id = (long) t;
     unsigned long mom;
     unsigned long testnum = 1;
-    while ((testnum += 2) <= max) {
+    /* search untill sqrt(n) */
+    while (testnum * testnum <= max) {
+        testnum += 2;
         if (!TEST(bitmap, testnum)) {
-            ++hits;
             for (mom = 3 * testnum; mom < max; mom += testnum << 1) {
                 SET(bitmap, mom);
             }
@@ -89,8 +89,14 @@ int main(int argc, char *argv[]) {
         pthread_join(threads[i], NULL);
     }
     theend = clock();
+
+    unsigned long k = 1;
+    while ((k += 2) < max)
+        if (!TEST(bitmap, k)) ++hits;
+
     printf("Main(): Waited on %d threads. Done.\n", num_threads);
-    std::cout << "found " << hits << " in ";
+    /* algorithm skips primes 1 and 2, so add them to the count */
+    std::cout << "found " << hits + 2 << " in ";
     std::cout << (((double) (theend - start)) / CLOCKS_PER_SEC);
     std::cout << " seconds" << std::endl;
 
@@ -101,7 +107,8 @@ int main(int argc, char *argv[]) {
     unsigned long k = 1;
     while ((k += 2) < max)
         if (!TEST(bitmap, k)) std::cout << k << "\t";
-     */
+     * */
+
     /* Clean up and exit */
     pthread_attr_destroy(&attr);
     pthread_exit(NULL);
