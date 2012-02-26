@@ -70,8 +70,8 @@ int main(int argc, char *argv[]) {
     (argc > 2) ? max = atol(argv[2]) : max = 4294967296;
     //upperlim = sqrt(max);
 
-    for (unsigned long mx = 2; mx <= 4294967296; mx = mx * 2) {
-        for (unsigned long food = 1; food <= 8; ++food) {
+    for (unsigned long mx = 1024; mx <= 4294967296; mx = mx * 2) {
+        for (unsigned long food = 1; food <= 10; ++food) {
             max = mx;
             num_threads = food;
 
@@ -110,13 +110,10 @@ int main(int argc, char *argv[]) {
 
             ncpus = sysconf(_SC_NPROCESSORS_ONLN);
             total_time = (((double) (theend - start)) / (double) CLOCKS_PER_SEC);
-            /* algorithm skips primes 1 and 2, so add them to the count */
-            //            std::cout << "Found " << hits + 2 << " primes.\n";
-            //            printf("Total time using %d threads : %.6f seconds\n",
-            //  num_threads, total_time / (num_threads < ncpus ? num_threads : ncpus));
-            // for gnuplot
-            printf("%ld %.6f ", max, total_time / (num_threads < ncpus ? num_threads : ncpus));
-            std::cout << num_threads << "\n";
+
+            printf("%ld\t",max);
+            printf("%.6f\t", total_time / (num_threads < ncpus ? num_threads : ncpus));
+            printf("%d\n" ,num_threads);
 
             //print_primes();
 
