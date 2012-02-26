@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     while ((k += 2) < max)
         if (!TEST(bitmap, k)) ++hits;
 
-    ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+    ncpus = sysconf(_SC_NPROCESSORS_ONLN); 
     /* algorithm skips primes 1 and 2, so add them to the count */
     std::cout << "Found " << hits + 2 << " primes.\n";
     total_time = (((double) (theend - start)) / (double) CLOCKS_PER_SEC);

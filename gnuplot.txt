@@ -7,4 +7,6 @@ set origin 0.0,0.0
 set nokey
 set xlabel "number of words"
 set ylabel "seconds"
-plot 'runtimes.out', 'runtimes.out'
+set pm3d
+#set style data pm3d
+splot 'runtimes.out', 'runtimes.out'
