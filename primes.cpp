@@ -2,8 +2,8 @@
 /*
  * Original Author: Robert M Adams (adamsro)
  * File: uniqify.cpp
- * Created: 2012 Feb 1, 18:35 by adamsro
- * Last Modified: 2012 Feb 7, 20:00 by adamsro
+ * Created: 2012 Feb 12, 18:35 by adamsro
+ * Last Modified: 2012 Feb 26, 20:00 by adamsro
  *
  * File contains a filter which spawns n sort processses based on a command
  * line argument. The primary purpose of this is project to learn pipes.
@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
     //print_primes();
 
     /* Clean up and exit */
+    free(bitmap);
     pthread_attr_destroy(&attr);
     pthread_exit(NULL);
 
