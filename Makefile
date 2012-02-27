@@ -1,4 +1,4 @@
-all: primes.o sieve.o  pdf
+all: primes.o pdf
 
 primes.o:
 	g++ -ggdb3 -Wall -lpthread primes.cpp -o primes

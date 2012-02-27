@@ -1,10 +1,13 @@
-
 /*
  * Original Author: Robert M Adams (adamsro)
  * File: uniqify.cpp
  * Created: 2012 Feb 15, 18:35 by adamsro
  * Last Modified: 2012 Feb 26, 20:00 by adamsro
  *
+ *  Program will calculate primes up to 2^32 using Sieve of Erastothenes with
+ * n threads
+ *
+ * helpful: http://www.fpx.de/fp/Software/
  */
 
 #include <cstdio>
@@ -32,6 +35,12 @@ int num_threads;
 int finished_threads; /* indicates that all threads are complete */
 unsigned long testnum;
 
+/*
+ * loops through odd numbers checking if bit has not be marked 'not prime'
+ *  if prime is found, mark all multiples not prime.
+ *
+ * @param void* t integer,id
+ */
 void *mark_not_prime(void *t) {
     unsigned long mom;
     //long my_id = (long) t;
@@ -48,6 +57,10 @@ void *mark_not_prime(void *t) {
     pthread_exit(NULL);
 }
 
+/*
+ * Print all prime numbers found.
+ * Must be called after threads all signal complete.
+ */
 void print_primes() {
     /* This alg speeds things up by not checking even numbers,
      * 2 however is an exception so it must be added to the output. */
@@ -70,6 +83,7 @@ int main(int argc, char *argv[]) {
     (argc > 2) ? max = atol(argv[2]) : max = 4294967296;
     //upperlim = sqrt(max);
 
+    // code for test looping
     for (unsigned long mx = 1024; mx <= 4294967296; mx = mx * 2) {
         for (unsigned long food = 1; food <= 10; ++food) {
             max = mx;
@@ -121,7 +135,6 @@ int main(int argc, char *argv[]) {
             free(bitmap);
             pthread_attr_destroy(&attr);
         }
-        sleep(1);
     }
     pthread_exit(NULL);
 }
