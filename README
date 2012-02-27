@@ -4,4 +4,6 @@ Program will calculate primes up to 2^32 using Sieve of Erastothenes with n thre
 
 Fastest runtime at 2^32 was 29.160000 seconds with 4 threads on os-class.engr.oregonstate.edu
 
+git branch "timing" has loops and output for plotting in gnuplot
+
 assignment: http://web.engr.oregonstate.edu/cgi-bin/cgiwrap/dmcgrath/classes/12W/cs311/index.cgi?file=project3
